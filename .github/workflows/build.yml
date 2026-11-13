@@ -13,6 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Unpack source bundle
+        # Lets you upload one source.zip from a phone instead of many folders.
+        run: |
+          if [ ! -f CMakeLists.txt ] && [ -f source.zip ]; then unzip -q source.zip; fi
+          ls
+
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
