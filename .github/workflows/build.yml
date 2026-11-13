@@ -1,10 +1,13 @@
-name: Build Hwraith
+name: Build Hwush Studio
 
 on:
   push:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   engine:
@@ -34,49 +37,53 @@ jobs:
       - name: Upload demo song
         uses: actions/upload-artifact@v4
         with:
-          name: hwraith-demo-wav
+          name: hwush-studio-demo-wav
           path: demo.wav
 
   android:
-    # Does real work only once an android/ project exists (Stage 1); until then every step after the check is skipped.
     name: Android APK
     runs-on: ubuntu-latest
     needs: engine
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for Android project
-        id: chk
+      - name: Unpack source bundle
         run: |
-          if [ -f android/settings.gradle.kts ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; echo "No android/ project yet, skipping."; fi
+          if [ ! -f CMakeLists.txt ] && [ -f source.zip ]; then unzip -q source.zip; fi
 
       - uses: actions/setup-java@v4
-        if: steps.chk.outputs.has == 'true'
         with:
           distribution: temurin
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
-        if: steps.chk.outputs.has == 'true'
 
       - name: Install NDK and CMake
-        if: steps.chk.outputs.has == 'true'
         run: sdkmanager "ndk;26.1.10909125" "cmake;3.22.1"
 
       - uses: gradle/actions/setup-gradle@v4
-        if: steps.chk.outputs.has == 'true'
         with:
           gradle-version: '8.7'
 
       - name: Build debug APK
-        if: steps.chk.outputs.has == 'true'
         working-directory: android
         run: gradle assembleDebug --no-daemon
 
-      - name: Upload APK
-        if: steps.chk.outputs.has == 'true'
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk HwushStudio-debug.apk
+
+      - name: Upload APK as a run artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hwraith-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          
+          name: hwush-studio-debug-apk
+          path: HwushStudio-debug.apk
+
+      - name: Publish to Releases
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: studio-dev
+          name: Hwush Studio dev build
+          body: Latest debug build of Hwush Studio. Replaced on every successful build.
+          prerelease: true
+          files: HwushStudio-debug.apk
